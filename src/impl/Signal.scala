@@ -33,7 +33,7 @@ trait SignalMultiAsyncExecutor extends MultiAsyncExecutor
     private[SignalMultiAsyncExecutor]
     val lock = new AnyRef
     private[SignalMultiAsyncExecutor]
-    val waiters = new AltQueue[WaitOpResumePoint[Any]]
+    val waitPoints = new AltQueue[WaitOpResumePoint[Any]]
     private[SignalMultiAsyncExecutor]
     var waitersCancelled = false
   }
@@ -47,11 +47,11 @@ trait SignalMultiAsyncExecutor extends MultiAsyncExecutor
         callback: SimpleCallback[Boolean]) = forceFork(pid, callback) {
     val signal = out.asInstanceOf[SignalImpl[A]]
     if (signal.emitted.compareAndSet(None, Some(value))) {
-      val waiters = signal.lock.synchronized {
+      val points = signal.lock.synchronized {
         signal.waitersCancelled = true
-        signal.waiters.clear
+        signal.waitPoints.clear
       }
-      waiters.foreach(_.resume(value))
+      points.foreach(_.resume(value))
       Some(Success(true))
     } else
       Some(Success(false))
@@ -66,7 +66,8 @@ trait SignalMultiAsyncExecutor extends MultiAsyncExecutor
       if (signal.emitted.get.isDefined)
         return
       signal.lock.synchronized {
-        signal.waiters.remove(node)
+        if (!signal.waitersCancelled)
+          signal.waitPoints.remove(node)
       }
     }
   }
@@ -90,7 +91,7 @@ trait SignalMultiAsyncExecutor extends MultiAsyncExecutor
               if (signal.waitersCancelled)
                 None
               else
-                Some(signal.waiters.push(point))
+                Some(signal.waitPoints.push(point))
             }
             node match {
               case Some(node) =>

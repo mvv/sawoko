@@ -92,7 +92,8 @@ trait ForkMultiAsyncExecutor extends MultiAsyncExecutor
               val handlesTimeout = false
               def cancel {
                 joinPid.joinLock.synchronized {
-                  joinPid.joinPoints.remove(node)
+                  if (joinPid.resultOption.isEmpty)
+                    joinPid.joinPoints.remove(node)
                 }
               }
             }
